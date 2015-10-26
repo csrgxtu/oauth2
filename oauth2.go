@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/sessions"
@@ -124,7 +124,7 @@ func LinkedIn(conf *oauth2.Config) martini.Handler {
 // WeChat returns a new WeChat OAuth 2.0 backend endpoint
 func WeChat(conf *oauth2.Config) martini.Handler {
 	conf.Endpoint = oauth2.Endpoint{
-		AuthURL: "https://open.weixin.qq.com/connect/qrconnect",
+		AuthURL:  "https://open.weixin.qq.com/connect/qrconnect",
 		TokenURL: "https://api.weixin.qq.com/sns/oauth2/access_token?grant_type=authorization_code",
 	}
 	return NewOAuth2ProviderCN(conf)
@@ -158,7 +158,7 @@ func NewOAuth2Provider(conf *oauth2.Config) martini.Handler {
 }
 
 // NewOAuth2ProviderCN returns a generic OAuth 2.0 backend endpoint.
-// mainly for China SNS
+// mainly for China WeChat
 func NewOAuth2ProviderCN(conf *oauth2.Config) martini.Handler {
 
 	return func(s sessions.Session, c martini.Context, w http.ResponseWriter, r *http.Request) {
