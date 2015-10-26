@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"strings"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/sessions"
@@ -120,6 +121,15 @@ func LinkedIn(conf *oauth2.Config) martini.Handler {
 	return NewOAuth2Provider(conf)
 }
 
+// WeChat returns a new WeChat OAuth 2.0 backend endpoint
+func WeChat(conf *oauth2.Config) martini.Handler {
+	conf.Endpoint = oauth2.Endpoint{
+		AuthURL: "https://open.weixin.qq.com/connect/qrconnect",
+		TokenURL: "https://api.weixin.qq.com/sns/oauth2/access_token?grant_type=authorization_code",
+	}
+	return NewOAuth2ProviderCN(conf)
+}
+
 // NewOAuth2Provider returns a generic OAuth 2.0 backend endpoint.
 func NewOAuth2Provider(conf *oauth2.Config) martini.Handler {
 
@@ -128,6 +138,34 @@ func NewOAuth2Provider(conf *oauth2.Config) martini.Handler {
 			switch r.URL.Path {
 			case PathLogin:
 				login(conf, s, w, r)
+			case PathLogout:
+				logout(s, w, r)
+			case PathCallback:
+				handleOAuth2Callback(conf, s, w, r)
+			}
+		}
+		tk := unmarshallToken(s)
+		if tk != nil {
+			// check if the access token is expired
+			if tk.Expired() && tk.Refresh() == "" {
+				s.Delete(keyToken)
+				tk = nil
+			}
+		}
+		// Inject tokens.
+		c.MapTo(tk, (*Tokens)(nil))
+	}
+}
+
+// NewOAuth2ProviderCN returns a generic OAuth 2.0 backend endpoint.
+// mainly for China SNS
+func NewOAuth2ProviderCN(conf *oauth2.Config) martini.Handler {
+
+	return func(s sessions.Session, c martini.Context, w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			switch r.URL.Path {
+			case PathLogin:
+				loginWeChat(conf, s, w, r)
 			case PathLogout:
 				logout(s, w, r)
 			case PathCallback:
@@ -169,6 +207,20 @@ func login(f *oauth2.Config, s sessions.Session, w http.ResponseWriter, r *http.
 			next = "/"
 		}
 		http.Redirect(w, r, f.AuthCodeURL(next), codeRedirect)
+		return
+	}
+	// No need to login, redirect to the next page.
+	http.Redirect(w, r, next, codeRedirect)
+}
+
+func loginWeChat(f *oauth2.Config, s sessions.Session, w http.ResponseWriter, r *http.Request) {
+	next := extractPath(r.URL.Query().Get(keyNextPage))
+	if s.Get(keyToken) == nil {
+		// User is not logged in.
+		if next == "" {
+			next = "/"
+		}
+		http.Redirect(w, r, strings.Replace(f.AuthCodeURL(next), "client_id", "appid", -1), codeRedirect)
 		return
 	}
 	// No need to login, redirect to the next page.
